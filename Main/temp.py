@@ -11,20 +11,19 @@ from moviepy import VideoFileClip
 import cv2
 from custom_emotion_analyzer import analyze_emotion_from_audio
 from dynamic_suggestions import get_grammar_suggestions
+from wpm import transcribe_audio, calculate_wpm
+from sentiment_analyzer import analyze_sentiment
 
-# Download necessary NLTK data
+
 nltk.download('punkt')
 
-# Load Whisper model
 whisper_model = whisper.load_model("medium")
 
-# Initialize Sentiment Analyzer
-analyzer = SentimentIntensityAnalyzer()
+#analyzer = SentimentIntensityAnalyzer()
 
 # Streamlit app
 st.title("Speech & Video Emotion & Analysis")
 
-# Upload audio or video file
 uploaded_file = st.file_uploader("Upload an audio/video file", type=["wav", "mp4", "avi", "mov"])
 
 if uploaded_file is not None:
@@ -90,21 +89,23 @@ if uploaded_file is not None:
 
     # Load audio and transcribe
     y, sr = librosa.load(audio_path, sr=16000)
-    text = whisper_model.transcribe(audio_path)["text"]
-    duration_seconds = len(y) / sr
+    text = transcribe_audio(audio_path)
+    #text = whisper_model.transcribe(audio_path)["text"]
+    #duration_seconds = len(y) / sr
 
     # WPM Calculation
-    def classify_wpm(wpm):
-        if wpm < 100:
-            return "Slow"
-        elif 100 <= wpm <= 150:
-            return "Normal"
-        else:
-            return "Fast"
+    # def classify_wpm(wpm):
+    #     if wpm < 100:
+    #         return "Slow"
+    #     elif 100 <= wpm <= 150:
+    #         return "Normal"
+    #     else:
+    #         return "Fast"
     
-    wpm = round(len(text.split()) / (duration_seconds / 60), 2)
+    # wpm = round(len(text.split()) / (duration_seconds / 60), 2)
 
-    wpm_category = classify_wpm(wpm)
+    # wpm_category = classify_wpm(wpm)
+    wpm, wpm_category, duration_seconds = calculate_wpm(audio_path, text)
 
     # Grammar Checking
     tool = language_tool_python.LanguageTool('en-US')
@@ -113,9 +114,10 @@ if uploaded_file is not None:
     final_grammar_score = max(0, 10 - ((grammar_errors / max(len(text.split()), 1)) * 100))
 
     # Sentiment Analysis
-    sentiment_score = analyzer.polarity_scores(text)
-    compound_score = sentiment_score['compound']
-    sentiment = "Positive" if compound_score > 0.05 else "Negative" if compound_score < -0.05 else "Neutral"
+    # sentiment_score = analyzer.polarity_scores(text)
+    # compound_score = sentiment_score['compound']
+    # sentiment = "Positive" if compound_score > 0.05 else "Negative" if compound_score < -0.05 else "Neutral"
+    sentiment, compound_score = analyze_sentiment(text)
 
     # Define original emotion labels from the model
     speech_emotions_map = ["Neutral", "Calm", "Happy", "Sad", "Angry", "Fearful", "Disgusted", "Surprised"]
@@ -124,7 +126,7 @@ if uploaded_file is not None:
     speech_emotion_mapping = {
         "Happy": "Happy",
         "Neutral": "Neutral",
-        "Calm": "Neutral",  # Treat "Calm" as "Neutral"
+        "Calm": "Neutral",  
         "Angry": "Nervous",
         "Fearful": "Nervous",
         "Sad": "Nervous",
@@ -133,9 +135,9 @@ if uploaded_file is not None:
 
     # Emotion Analysis using DeepFace
     if file_extension in ["mp4", "avi", "mov"]:
-        st.write("### 📷 Facial Emotion:", dominant_facial_emotion)
+        st.write("### Facial Emotion:", dominant_facial_emotion)
 
-    st.write("### 🔍 Segment-based Emotion Analysis (Your Model)")
+    st.write("### Segment-based Emotion Analysis (Your Model)")
 
     model_json_path = "CNN_model.json"
     model_weights_path = "best_model.keras"
@@ -147,7 +149,7 @@ if uploaded_file is not None:
             model_weights_path=model_weights_path
         )
         st.dataframe(df_custom_emotion)
-        st.write(f"✅ Final Emotion (Segment-wise): **{final_custom_emotion}**")
+        st.write(f"Final Emotion (Segment-wise): **{final_custom_emotion}**")
         st.write(f"Segments processed: {stats['valid_segments']} / {stats['total_segments']}")
     else:
         st.warning("Custom model files not found. Please upload 'model_architecture.json' and 'model_weights.keras'.")

@@ -1,14 +1,25 @@
 from dotenv import load_dotenv
 from google import genai
+import language_tool_python
+from nltk.tokenize import sent_tokenize
 import os
 
-# Initialize the GenAI client with your API key
+# Initialize the GenAI client 
 load_dotenv()
 client = genai.Client(api_key= os.getenv("OPENAI_API_KEY"))
 
-# Function to get grammar improvement suggestions
+def get_grammar_score(text):
+    """
+    Calculates grammar score and errors from the provided text.
+    """
+    tool = language_tool_python.LanguageTool('en-US')
+    sentences = sent_tokenize(text)
+    grammar_errors = sum(len(tool.check(sentence)) for sentence in sentences)
+    grammar_score = max(0, 10 - ((grammar_errors / max(len(text.split()), 1)) * 100))
+    return grammar_score, grammar_errors
+
+
 def get_grammar_suggestions(grammar_score):
-    # Prompt for grammar suggestions based on the score
     prompt = f"""
     You are sitting in an interview and you're proficient in speaking english. Based on the grammar score provided, give:
     1. 3-4 grammar improvement suggestions tailored to the score.
@@ -19,24 +30,20 @@ def get_grammar_suggestions(grammar_score):
     Suggestions:
     """
     try:
-        # Call Google GenAI to generate content
         response = client.models.generate_content(
-            model="gemini-2.0-flash",  # Use the appropriate GenAI model
+            model="gemini-2.0-flash",  
             contents=prompt
         )
-        # Extract and return the suggestions
+    
         return response.text
     except Exception as e:
         return f"Error: {e}"
 
 # Example usage
 if __name__ == "__main__":
-    # Example grammar score
     grammar_score = 6.5
 
-    # Get suggestions
     suggestions = get_grammar_suggestions(grammar_score)
 
-    # Print the suggestions
     print("Dynamic Suggestions:")
     print(suggestions)
